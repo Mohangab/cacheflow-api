@@ -1,5 +1,11 @@
 # CacheFlow API
 
+[![CI](https://github.com/Mohangab/cacheflow-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohangab/cacheflow-api/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis)](https://redis.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Spring Boot 3 + Redis** product-catalog demo by [Mohan Venkatesh Kola](https://github.com/Mohangab).
 
 Resume line this project proves:
@@ -23,12 +29,24 @@ Reference data (product catalog) is read far more than written. Caching it in Re
 2. **TTL** auto-expires stale entries (`products` = 5 min, `productsByCategory` = 2 min by default).
 3. **Eviction on writes** keeps the cache coherent when you create / update / delete.
 
+```mermaid
+flowchart TD
+  Client[Client / curl / Swagger]
+  API[Spring Boot ProductService]
+  Redis[(Redis cache)]
+  DB[(H2 / JPA)]
+
+  Client -->|GET by id or category| API
+  API -->|@Cacheable| Redis
+  Redis -->|HIT| API
+  Redis -->|MISS| DB
+  DB -->|load + TTL populate| Redis
+  API -->|JSON response| Client
+  Client -->|POST / PUT / DELETE| API
+  API -->|@CacheEvict / @CachePut| Redis
 ```
-Client ──► Spring Boot ──► @Cacheable ──► Redis (HIT? return)
-                              │ MISS
-                              ▼
-                            JPA / H2  ──► populate Redis (TTL)
-```
+
+**Miss vs hit in one glance:** first `GET /api/products/1` sleeps ~400ms on the DB path; the second call is served from Redis and is near-instant. Watch logs for `CACHE MISS` / `CACHE HIT`.
 
 ---
 
