@@ -109,6 +109,8 @@ Needs Docker. Starts Redis + the API.
 docker compose up --build
 ```
 
+Compose waits for a healthy Redis (`redis-cli ping`) before starting the API. Both services declare healthchecks — `docker compose ps` should show `healthy` once the Actuator probe passes.
+
 API: http://localhost:8080  
 Swagger: http://localhost:8080/swagger-ui.html  
 Health: http://localhost:8080/actuator/health  
