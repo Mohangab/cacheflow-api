@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Redis-backed Spring Cache manager with per-cache TTLs.
+ * Redis-backed Spring Cache manager with per-cache TTLs from {@link CacheProperties}.
  * <ul>
  *   <li>{@code products} — single product by id</li>
  *   <li>{@code productsByCategory} — list by category (shorter TTL)</li>
@@ -34,15 +33,18 @@ public class RedisCacheConfig {
     public static final String CACHE_PRODUCTS = "products";
     public static final String CACHE_PRODUCTS_BY_CATEGORY = "productsByCategory";
 
-    @Value("${cacheflow.cache.products-ttl-seconds:300}")
-    private long productsTtlSeconds;
+    private final CacheProperties cacheProperties;
 
-    @Value("${cacheflow.cache.products-by-category-ttl-seconds:120}")
-    private long productsByCategoryTtlSeconds;
+    public RedisCacheConfig(CacheProperties cacheProperties) {
+        this.cacheProperties = cacheProperties;
+    }
 
     @Bean
     @Primary
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        long productsTtlSeconds = cacheProperties.getProductsTtlSeconds();
+        long productsByCategoryTtlSeconds = cacheProperties.getProductsByCategoryTtlSeconds();
+
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

@@ -131,6 +131,13 @@ Cache demo: http://localhost:8080/api/demo/cache-stats
 
 Optional env (see `.env.example`): `REDIS_HOST`, `REDIS_PORT`, `CACHE_PRODUCTS_TTL`, `CACHE_CATEGORY_TTL`.
 
+| Property / env | Default | Meaning |
+|----------------|---------|---------|
+| `cacheflow.cache.products-ttl-seconds` / `CACHE_PRODUCTS_TTL` | `300` | TTL for `products` (by-id) |
+| `cacheflow.cache.products-by-category-ttl-seconds` / `CACHE_CATEGORY_TTL` | `120` | TTL for `productsByCategory` |
+
+TTLs are bound via `CacheProperties` and applied in `RedisCacheConfig`.
+
 ### Tests
 
 ```bash
