@@ -132,6 +132,32 @@ class ProductServiceCacheTest {
         assertThat(productService.getDbLoadCount()).isEqualTo(loadsAfterWarm + 1);
     }
 
+
+    @Test
+    void warmCaches_preloadsProductsAndCategories_withoutExtraMisses() {
+        productRepository.save(new Product("Warm A", "Labs", new BigDecimal("1.00"), "a"));
+        productRepository.save(new Product("Warm B", "Labs", new BigDecimal("2.00"), "b"));
+        productRepository.save(new Product("Warm C", "Tools", new BigDecimal("3.00"), "c"));
+
+        long before = productService.getDbLoadCount();
+        var result = productService.warmCaches();
+
+        assertThat(result.get("warmedProducts")).isEqualTo(
+                (int) productRepository.count()); // may include seeder rows
+        assertThat(((Number) result.get("warmedCategories")).intValue()).isGreaterThanOrEqualTo(2);
+        assertThat(productService.getDbLoadCount()).isEqualTo(before + 1);
+
+        long afterWarm = productService.getDbLoadCount();
+        // Subsequent reads should be cache hits (no additional DB loads).
+        Product first = productRepository.findAll().stream()
+                .filter(p -> "Warm A".equals(p.getName()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(productService.getById(first.getId()).getName()).isEqualTo("Warm A");
+        assertThat(productService.listByCategory("Labs").getItems()).isNotEmpty();
+        assertThat(productService.getDbLoadCount()).isEqualTo(afterWarm);
+    }
+
     private static int findFreePort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
