@@ -152,7 +152,7 @@ Cache tests use **embedded Redis** (`com.github.codemonstur:embedded-redis`) —
 
 ## Curl demo — miss then hit
 
-Seed data loads six products on startup. Product `1` is *Wireless Mouse*.
+Seed data loads a 13-product catalog across Electronics, Furniture, Stationery, Accessories, and Home Office. Product `1` is *Wireless Mouse*.
 
 ```bash
 # Clear demo counters / caches (optional)
