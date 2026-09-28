@@ -8,6 +8,8 @@ import com.mohan.cacheflow.entity.Product;
 import com.mohan.cacheflow.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -17,8 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * Cache-aside product service.
@@ -36,10 +41,12 @@ public class ProductService {
     private static final long SIMULATED_DB_LATENCY_MS = 400L;
 
     private final ProductRepository productRepository;
+    private final CacheManager cacheManager;
     private final AtomicLong dbLoads = new AtomicLong();
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, CacheManager cacheManager) {
         this.productRepository = productRepository;
+        this.cacheManager = cacheManager;
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +131,47 @@ public class ProductService {
         }
         productRepository.deleteById(id);
         log.info("Deleted product id={} — evicted related Redis cache entries", id);
+    }
+
+
+    /**
+     * Pre-load Redis from H2 for demos / cold starts.
+     * Loads the full catalog once (no simulated per-row latency), then writes
+     * {@code products} and {@code productsByCategory} entries via the CacheManager.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> warmCaches() {
+        List<Product> all = productRepository.findAll();
+        dbLoads.incrementAndGet();
+        log.info("CACHE WARM — loaded {} products from H2 in one scan", all.size());
+
+        Cache products = cacheManager.getCache(RedisCacheConfig.CACHE_PRODUCTS);
+        Cache byCategory = cacheManager.getCache(RedisCacheConfig.CACHE_PRODUCTS_BY_CATEGORY);
+        if (products == null || byCategory == null) {
+            throw new IllegalStateException("Required caches not configured");
+        }
+
+        for (Product product : all) {
+            products.put(product.getId(), ProductResponse.from(product));
+        }
+
+        Map<String, List<ProductResponse>> grouped = all.stream()
+                .map(ProductResponse::from)
+                .collect(Collectors.groupingBy(
+                        r -> r.getCategory().toLowerCase(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        for (Map.Entry<String, List<ProductResponse>> entry : grouped.entrySet()) {
+            byCategory.put(entry.getKey(), new ProductListResponse(entry.getValue()));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("warmedProducts", all.size());
+        result.put("warmedCategories", grouped.size());
+        result.put("categories", grouped.keySet());
+        result.put("dbLoadsSinceStart", dbLoads.get());
+        return result;
     }
 
     public long getDbLoadCount() {

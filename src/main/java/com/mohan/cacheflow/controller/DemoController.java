@@ -1,5 +1,6 @@
 package com.mohan.cacheflow.controller;
 
+import com.mohan.cacheflow.config.CacheProperties;
 import com.mohan.cacheflow.config.RedisCacheConfig;
 import com.mohan.cacheflow.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,15 +25,18 @@ public class DemoController {
     private final CacheManager cacheManager;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisConnectionFactory redisConnectionFactory;
+    private final CacheProperties cacheProperties;
 
     public DemoController(ProductService productService,
                           CacheManager cacheManager,
                           StringRedisTemplate stringRedisTemplate,
-                          RedisConnectionFactory redisConnectionFactory) {
+                          RedisConnectionFactory redisConnectionFactory,
+                          CacheProperties cacheProperties) {
         this.productService = productService;
         this.cacheManager = cacheManager;
         this.stringRedisTemplate = stringRedisTemplate;
         this.redisConnectionFactory = redisConnectionFactory;
+        this.cacheProperties = cacheProperties;
     }
 
     @GetMapping("/cache-stats")
@@ -40,9 +44,14 @@ public class DemoController {
     public Map<String, Object> cacheStats() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dbLoadsSinceStart", productService.getDbLoadCount());
-        body.put("note", "dbLoads increments only on CACHE MISS (method body ran). "
-                + "Watch application logs for 'CACHE HIT' / 'CACHE MISS' lines.");
+        body.put("note", "dbLoads increments only on CACHE MISS (method body ran) or a warm scan. "
+                + "Watch application logs for 'CACHE HIT' / 'CACHE MISS' / 'CACHE WARM' lines.");
         body.put("cacheNames", cacheManager.getCacheNames());
+
+        Map<String, Long> ttls = new LinkedHashMap<>();
+        ttls.put("productsTtlSeconds", cacheProperties.getProductsTtlSeconds());
+        ttls.put("productsByCategoryTtlSeconds", cacheProperties.getProductsByCategoryTtlSeconds());
+        body.put("configuredTtls", ttls);
 
         Set<String> keys = stringRedisTemplate.keys("*");
         body.put("redisKeyCount", keys == null ? 0 : keys.size());
@@ -57,6 +66,12 @@ public class DemoController {
             body.put("redisVersion", "unavailable");
         }
         return body;
+    }
+
+    @PostMapping("/cache/warm")
+    @Operation(summary = "Pre-warm products + category caches from H2 (single DB scan)")
+    public Map<String, Object> warmCaches() {
+        return productService.warmCaches();
     }
 
     @PostMapping("/cache-stats/reset")

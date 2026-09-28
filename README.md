@@ -158,6 +158,9 @@ Seed data loads six products on startup. Product `1` is *Wireless Mouse*.
 # Clear demo counters / caches (optional)
 curl -s -X DELETE http://localhost:8080/api/demo/cache
 
+# Optional: pre-warm Redis from H2 (one DB scan), then every GET is a HIT
+curl -s -X POST http://localhost:8080/api/demo/cache/warm | jq .
+
 # 1st call → CACHE MISS → ~400ms+ (DB load)
 time curl -s http://localhost:8080/api/products/1 | jq .
 
@@ -201,6 +204,7 @@ CACHE EVICT — cache='productsByCategory' ...
 | PUT | `/api/products/{id}` | Update + refresh/evict |
 | DELETE | `/api/products/{id}` | Delete + evict |
 | GET | `/api/demo/cache-stats` | Demo visibility |
+| POST | `/api/demo/cache/warm` | Pre-warm products + category caches |
 | DELETE | `/api/demo/cache` | Clear both caches |
 | GET | `/swagger-ui.html` | OpenAPI UI |
 | GET | `/actuator/health` | Liveness |
